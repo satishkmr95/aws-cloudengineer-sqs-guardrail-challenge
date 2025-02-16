@@ -156,13 +156,14 @@ Resources:
 
 
   # Control Tower Guardrail
+  # https://docs.aws.amazon.com/controltower/latest/controlreference/all-global-identifiers.html
+  # CT.SQS.PR.1
+  # https://docs.aws.amazon.com/controltower/latest/controlreference/sqs-rules.html#ct-sqs-pr-1-description
   ControlTowerGuardrail:
     Type: AWS::ControlTower::EnabledControl
     Properties:
-      ControlIdentifier: "arn:aws:controlcatalog:::control/bv0kk64dmkuv1vfbiwbj3vcrw"
-      #ControlIdentifier:  "arn:aws:controltower:us-east-1::control/CT.SQS.PR.1"
+      ControlIdentifier: !Sub "arn:${AWS::Partition}:controltower:${AWSRegion}::control/bv0kk64dmkuv1vfbiwbj3vcrw"
       TargetIdentifier: !Sub "arn:${AWS::Partition}:organizations::${ManagementAccountId}:ou/${OrganizationId}/${OrganizationalUnitId}"
-      #TargetIdentifier: !Sub "arn:aws:organizations::${ManagementAccountId}:ou/o-rjak1nn0gr/${OrganizationalUnitId}"
 
 
 Outputs:
