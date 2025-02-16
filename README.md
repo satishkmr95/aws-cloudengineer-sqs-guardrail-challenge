@@ -173,7 +173,3 @@ jobs:
 ```
 
 This CI/CD setup ensures that updates to the repository are automatically deployed to AWS.
-
-
-## Potential improvement
-- At the moment aws cli command doesn't wait for the stack set status(I have added shell script to do so), It can be improve to use cft wait command or use sam deploy command to deploy the cft stacksets.
