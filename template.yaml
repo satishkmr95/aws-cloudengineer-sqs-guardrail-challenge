@@ -16,7 +16,7 @@ Parameters:
     Description: Memory size (in MB) for the Lambda function.
   LambdaTimeout:
     Type: Number
-    Default: 10
+    Default: 30
     Description: Timeout (in seconds) for the Lambda function.
   LambdaCodeS3Bucket:
     Type: String
@@ -66,10 +66,13 @@ Resources:
               - ec2:DescribeVpcEndpoints
               - sqs:GetQueueAttributes
               - sqs:ListQueueTags
+              - sqs:CreateQueue
               - kms:DescribeKey
               - kms:ListAliases
               - sns:Publish
               - kms:Decrypt
+              - logs:CreateLogStream
+              - logs:PutLogEvents
             Resource: '*'
 
   # IAM Role for Lambda Function
@@ -125,6 +128,7 @@ Resources:
       Environment:
         Variables:
           SNS_TOPIC_ARN: !Ref ComplianceSNSTopic
+          AWS_REGION_NAME: !Ref AWSRegion
 
   # EventBridge Rule
   EventBridgeRule:
