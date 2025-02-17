@@ -39,10 +39,10 @@ Ensure you have the following:
   OrganizationId=oxxxxxxx
   AWS_REGION=us-east-1
   ```
-  LambdaCodeS3Bucket variable will be used to store the Artifacts of GitHub action pipeline
-  LambdaCodeS3Key variable store the zip file name
-  OrganizationId variable stores AWS Organization ID
-  OrganizationalUnitIds variable stores OU Id where you want to deploy your solution
+  **LambdaCodeS3Bucket** variable will be used to store the Artifacts of GitHub action pipeline \
+  **LambdaCodeS3Key** variable store the zip file name \
+  **OrganizationId** variable stores AWS Organization ID \
+  **OrganizationalUnitIds** variable stores OU Id where you want to deploy your solution
 
 - One secret: `ROLENAME` i.e basically a session name, set this as a repository secret
 
@@ -66,7 +66,7 @@ Ensure you have the following:
 
 ### CFT Parameters
 
-- I have added following parameters in the ```sh deploy.yml``` file as it will change according to your setup
+- I have added following parameters in the ``` deploy.yml``` file as it will change according to your setup
 - LambdaCodeS3Bucket
 - LambdaCodeS3Key
 - OrganizationId
