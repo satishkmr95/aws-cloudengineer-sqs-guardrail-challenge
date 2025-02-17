@@ -1,5 +1,4 @@
-# SecretCode: <YourGitHubUsername>-2025-<YourRandom3CharCode>
-
+# SecretCode: satishkmr95-2025-192
 import boto3
 import logging
 import os
@@ -17,6 +16,8 @@ sns_client = boto3.client('sns')
 # Constants
 REQUIRED_TAGS = ['Name', 'Created By', 'Cost Center']
 SNS_TOPIC_ARN = os.environ.get('SNS_TOPIC_ARN')
+AWS_REGION_NAME = os.environ.get('AWS_REGION_NAME')
+
 
 def check_vpc_endpoint_exists():
     """
@@ -25,15 +26,17 @@ def check_vpc_endpoint_exists():
     try:
         response = ec2_client.describe_vpc_endpoints(
             Filters=[
-                {'Name': 'service-name', 'Values': ['com.amazonaws.us-east-1.sqs']}
+                {'Name': 'service-name', 'Values': [f'com.amazonaws.{AWS_REGION_NAME}.sqs']}
             ]
         )
         if not response['VpcEndpoints']:
+            logger.error(f"VpcEndpoints doesn't exist!!")
             return False
-        return True
+        else:
+            logger.info(f"VpcEndpoints exist!!")
+            return True
     except ClientError as e:
         logger.error(f"Error checking VPC endpoint: {e}")
-        raise
 
 def check_encryption_at_rest(queue_url):
     """
@@ -45,11 +48,14 @@ def check_encryption_at_rest(queue_url):
             AttributeNames=['KmsMasterKeyId']
         )
         if 'KmsMasterKeyId' not in response['Attributes']:
+            logger.error(f"encryption doesn't exist!!")
             return False
-        return True
-    except ClientError as e:
-        logger.error(f"Error checking encryption: {e}")
-        raise
+        else:
+            logger.info(f"Encryption exist!!")
+            return True
+    except Exception as e:
+        logger.error(f"Unexpected error: {e} in check_encryption_at_rest function")
+        logger.error(f"Encryption doesn't exist!!")
 
 def check_customer_managed_key(queue_url):
     """
@@ -62,11 +68,14 @@ def check_customer_managed_key(queue_url):
         )
         key_id = response['Attributes'].get('KmsMasterKeyId')
         if not key_id or key_id.startswith('alias/aws/'):
+            logger.error(f"CMK doesn't exist!!")
             return False
-        return True
-    except ClientError as e:
-        logger.error(f"Error checking CMK: {e}")
-        raise
+        else:
+            logger.info(f"CMK exist!!")
+            return True
+    except Exception as e:
+        logger.error(f"Unexpected error: {e} in check_customer_managed_key function")
+        logger.error(f"CMK doesn't exist!!")
 
 def check_tags(queue_url):
     """
@@ -77,11 +86,13 @@ def check_tags(queue_url):
         tags = response.get('Tags', {})
         for tag in REQUIRED_TAGS:
             if tag not in tags:
+                logger.error(f"Tag doesn't exist!!")
                 return False
-        return True
-    except ClientError as e:
-        logger.error(f"Error checking tags: {e}")
-        raise
+            else:
+                logger.info(f"Tag exist!!")
+                return True
+    except Exception as e:
+        logger.error(f"Unexpected error: {e} in check_tags function")
 
 def trigger_alert(message):
     """
@@ -102,7 +113,7 @@ def lambda_handler(event, context):
     """
     Main Lambda function handler.
     """
-    queue_url = event.get('QueueUrl')
+    queue_url = event["detail"]["responseElements"]["queueUrl"]
     if not queue_url:
         logger.error("QueueUrl not provided in the event.")
         return
@@ -113,15 +124,19 @@ def lambda_handler(event, context):
         'Customer-Managed Key Check': check_customer_managed_key(queue_url),
         'Tag Verification Check': check_tags(queue_url)
     }
+    result_messages = []
 
-    failed_checks = [check_name for check_name, result in checks.items() if not result]
+    for check, value in checks.items():
+        if value:
+            result_messages.append(f"✅ {check} passed.")
+        else:
+            result_messages.append(f"❌ {check} doesn't exist or failed.")
 
-    if failed_checks:
-        alert_message = f"Compliance checks failed for queue {queue_url}. Failed checks: {', '.join(failed_checks)}"
-        trigger_alert(alert_message)
-    else:
-        logger.info("All compliance checks passed.")
+    # Join the messages into a single string
+    final_message = "\n".join(result_messages)
 
+    # Print the final report
+    trigger_alert(final_message)
     return {
         'statusCode': 200,
         'body': 'Compliance checks completed.'
