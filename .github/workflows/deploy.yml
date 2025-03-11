@@ -65,4 +65,5 @@ jobs:
                 S3BucketName=${{ env.BUCKET_NAME }} \
                 LambdaFunctionZip=${{ env.ARTIFACT_NAME }} \
                 TargetOUArn=${{ vars.OU_ARN }} \
-                ControlIdentifier=${{ vars.CONTROL_IDENTIFIER }}
+                ControlIdentifier=${{ vars.CONTROL_IDENTIFIER }} \
+                PermissionBoundaryArn=${{ vars.PERMISSION_BOUNDARY_ARN }} \

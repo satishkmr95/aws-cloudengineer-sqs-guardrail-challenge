@@ -71,7 +71,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - sns:Publish
-                Resource: 
+                Resource:
                   - !Ref SNSTopicArn
 
   #### Lambda Function ####
