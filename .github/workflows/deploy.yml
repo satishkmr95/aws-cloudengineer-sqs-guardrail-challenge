@@ -19,7 +19,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ${{ vars.AWS_REGION }}
 
       - name: Create S3 Bucket (if not exists)
         run: |
@@ -64,5 +64,5 @@ jobs:
             --parameter-overrides \
                 S3BucketName=${{ env.BUCKET_NAME }} \
                 LambdaFunctionZip=${{ env.ARTIFACT_NAME }} \
-                TargetOUArn=${{ env.OU_ARN }} \
-                ControlIdentifier=${{ env.CONTROL_IDENTIFIER }}
+                TargetOUArn=${{ vars.OU_ARN }} \
+                ControlIdentifier=${{ vars.CONTROL_IDENTIFIER }}
