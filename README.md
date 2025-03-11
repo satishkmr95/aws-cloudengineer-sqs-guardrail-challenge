@@ -1,70 +1,76 @@
-# Cloud Engineer Guardrail Challenge: SQS Security Compliance
-
 ## Overview
+This project implements an enterprise-grade security guardrail for newly created Amazon SQS queues. 
+The solution consists of an AWS Lambda function triggered by EventBridge and enforced security policies using AWS Control Tower.
 
-In this assignment you will build an enterprise-grade solution using AWS CloudFormation (YAML only) and a Python Lambda function. The solution will serve as a guardrail for newly created SQS queues. You will deploy your solution via GitHub by forking the repository and submitting a pull request. Use of GitHub Actions for CI/CD is a bonus.
+## Architecture
+- **AWS Lambda**: Checks compliance for newly created SQS queues.
+- **IAM Role**: Provides permissions for Lambda with a permission boundary.
+- **EventBridge Rule**: Triggers Lambda when an SQS queue is created.
+- **SNS Topic (Optional)**: Sends alerts if compliance checks fail.
+- **AWS Control Tower**: Enforces a guardrail requiring all SQS queues to have a Dead-Letter Queue (DLQ).
 
----
+## Deployment Instructions
 
-## Assignment Requirements
 
-### 1. CloudFormation Template (YAML Only)
+### **1. Deploy CloudFormation to Create the S3 Bucket**
+```sh
+aws cloudformation deploy \
+    --template-file s3_bucket.yaml \
+    --stack-name SQSInitialSetup \
+    --capabilities CAPABILITY_NAMED_IAM
+```
 
-- **Template Language:** YAML exclusively.
-- **Resources:**
-  - **Lambda Function:** Deploy a Python-based Lambda function.
-  - **IAM Role:** Create an IAM role for the Lambda function with an attached permission boundary. You can define the managed policy in the same template or reference an external policy via a parameter.
-  - **EventBridge Rule:** Configure an EventBridge rule to trigger the Lambda function on SQS queue creation events (for example, when the `CreateQueue` API call is made).
-  - **Optional Alerting Mechanism:** Optionally, create an SNS topic that the Lambda function can use to publish alerts.
-  - **Control Tower Guardrail:** Via CloudFormation, add a native Control Tower enabled control that enforces a guardrail requiring any Amazon SQS queue to have a dead-letter queue configured in **us-east-1**. This enabled control should be applied to an example Organizational Unit (OU). DO NOT use a Lambda function to enable this control, it must be done via Cloudformation resource.
-- **Parameters & Outputs:**
-  - Parameterize key properties such as Lambda runtime, memory size, permission boundary ARN, and SNS topic ARN (if used).
-  - Include outputs that provide resource ARNs (e.g., Lambda function ARN, IAM role ARN).
+### **1. Package and Upload Lambda Code to S3**
+```sh
+zip -r lambda_function.zip lambda_function/
 
-### 2. Python Lambda Function
+S3_BUCKET_NAME=$(
+    aws cloudformation describe-stacks \
+        --stack-name SQSInitialSetup \
+        --query "Stacks[0].Outputs[?OutputKey=='S3BucketName'].OutputValue" \
+        --output text
+)
 
-- **Trigger:** The function must be invoked upon an SQS queue creation event.
-- **Functionality:** The Lambda function should perform the following checks:
-  - **VPC Endpoint Check:** Verify that a VPC endpoint for SQS exists.
-  - **Encryption-at-Rest:** Ensure that the SQS queue has encryption enabled.
-  - **Customer-Managed Key (CMK):** Confirm that the queue uses a customer-managed key (CMK) rather than an AWS-managed key.
-  - **Tag Verification:** Check that the queue is tagged with the following keys (values can be arbitrary):
-    - **Name**
-    - **Created By**
-    - **Cost Center**
-  - **Alerting:** If any check fails, trigger an alert (for example, by publishing a message to an SNS topic or by logging an error).
-- **Code Quality:**  
-  - Follow Python best practices (logging, error handling, modularity, and inline documentation).
-  - Ensure that the very first line of your Python file contains a comment in the following format:
-    ```
-    # SecretCode: <YourGitHubUsername>-2025-<YourRandom3CharCode>
-    ```
-    *(Replace `<YourGitHubUsername>` and `<YourRandom3CharCode>` with your own values.)*
+aws s3 cp lambda_function.zip s3://$S3_BUCKET_NAME/lambda_function.zip
+```
 
-### 3. Documentation (README)
+### **2. Deploy CloudFormation Stack**
+```sh
 
-Your README file should include:
+TARGET_OU_ARN=arn:aws:organizations::123456789012:ou/o-abcdefg/ou-xyz
+CONTROL_IDENTIFIER=AWS-GR_RESTRICTED_SQS_NO_DEAD_LETTER_QUEUE
 
-- **Deployment Instructions:**  
-  - Step-by-step guidance to deploy the CloudFormation stack using the AWS CLI or AWS Console.
-  - Explanation of any required parameters.
-- **Design Decisions:**  
-  - A brief description of your approach to implementing the permission boundary and how your solution can be extended or applied in a multi-account environment.
-- **Bonus (Optional):**  
-  - Any GitHub Actions configuration you add to demonstrate CI/CD capabilities is a bonus.
+aws cloudformation deploy \
+    --template-file template.yaml \
+    --stack-name SQSSecurityGuardrail \
+    --capabilities CAPABILITY_NAMED_IAM \
+    --parameter-overrides S3BucketName=$S3_BUCKET_NAME TargetOUArn=$TARGET_OU_ARN ControlIdentifier=$CONTROL_IDENTIFIER
+```
 
-### 4. Packaging & Submission
+## Parameters
+| Parameter              | Description |
+|------------------------|------------|
+| LambdaRuntime         | Python runtime version for Lambda (default: python3.11) |
+| LambdaMemory          | Memory allocation for Lambda (default: 256MB) |
+| PermissionBoundaryArn | ARN of IAM Permission Boundary |
+| SNSTopicArn           | ARN of SNS topic for alerts (optional) |
+| S3BucketName          | Name of the S3 bucket containing the Lambda function code |
+| LambdaFunctionZip     | Name of the Lambda function code ZIP file in the S3 bucket |
 
-- **Suggested File Structure:**
+## Outputs
+| Output              | Description |
+|---------------------|------------|
+| LambdaFunctionARN  | ARN of the deployed Lambda function |
+| IAMRoleARN        | ARN of the IAM role for Lambda |
+| SNSTopicARN       | ARN of the SNS topic (if enabled) |
 
-  ```
-  /CloudGuardRailChallenge.zip
-  ├── README.md
-  ├── template.yaml         # CloudFormation template in YAML
-  └── lambda_function
-      └── lambda_function.py  # Python Lambda code
-  ```
+## Design Decisions
+- **Permission Boundary**: Ensures Lambda operates within a strict security scope.
+- **Multi-Account Strategy**: The solution can be applied across multiple accounts using AWS Organizations.
 
-- **Submission:**  
-  - Fork this GitHub repository for this test.
-  - Commit your changes and submit a pull request for evaluation.
+## Enhancements (Future Work)
+- Add GitHub Actions for CI/CD deployment automation.
+- Implement additional compliance checks (e.g., SQS policy validation).
+
+## Author
+Andres Solarte, [GitHub](https://github.com/andres-solarte)

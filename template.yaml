@@ -1,0 +1,156 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation template to enforce SQS security compliance.
+
+Parameters:
+  LambdaRuntime:
+    Type: String
+    Default: python3.11
+
+  PermissionBoundaryArn:
+    Type: String
+
+  SNSTopicArn:
+    Type: String
+    Default: ""
+
+  S3BucketName:
+    Type: String
+    Description: Name of the S3 bucket where the Lambda function code is stored.
+
+  LambdaFunctionZip:
+    Type: String
+    Description: Name of the Lambda function code ZIP file in the S3 bucket.
+
+  TargetOUArn:
+    Type: String
+    Description: ARN of the Organizational Unit (OU) where the Control Tower guardrail should be applied.
+
+  ControlIdentifier:
+    Type: String
+    Description: AWS Control Tower Control Identifier to enforce compliance.
+    AllowedValues:
+      - AWS-GR_RESTRICTED_SQS_NO_DEAD_LETTER_QUEUE # This is the one we should use in this example
+      - AWS-GR_ENCRYPTION_S3_BUCKETS
+      - AWS-GR_RESTRICTED_S3_PUBLIC_READ_ACCESS
+      - AWS-GR_RESTRICTED_S3_PUBLIC_WRITE_ACCESS
+      - AWS-GR_ENCRYPTION_EBS_VOLUMES
+      - AWS-GR_ENCRYPTION_RDS_STORAGE
+      - AWS-GR_ENCRYPTION_REDSHIFT_STORAGE
+
+Resources:
+  #### IAM Role for Lambda ####
+  SQSSecurityLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: SQSSecurityLambdaRole
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref PermissionBoundaryArn
+      Policies:
+        - PolicyName: SQSLambdaPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - sqs:GetQueueAttributes
+                  - sqs:ListQueues
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - sns:Publish
+                Resource: 
+                  - !Ref SNSTopicArn
+
+  #### Lambda Function ####
+  SQSSecurityLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: SQSSecurityCheck
+      Runtime: !Ref LambdaRuntime
+      Handler: function.lambda_handler
+      MemorySize: 256
+      Timeout: 10
+      Role: !GetAtt SQSSecurityLambdaRole.Arn
+      Code:
+        S3Bucket: !Ref S3BucketName
+        S3Key: !Ref LambdaFunctionZip
+      Environment:
+        Variables:
+          SNS_TOPIC_ARN: !Ref SNSTopicArn
+
+  #### EventBridge Rule ####
+  SQSEventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: SQSCreationRule
+      EventPattern:
+        source:
+          - "aws.sqs"
+        detail-type:
+          - "AWS API Call via CloudTrail"
+        detail:
+          eventSource:
+            - "sqs.amazonaws.com"
+          eventName:
+            - "CreateQueue"
+      Targets:
+        - Arn: !GetAtt SQSSecurityLambda.Arn
+          Id: "SQSSecurityLambdaTarget"
+
+  #### Permissions for EventBridge to invoke Lambda ####
+  LambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref SQSSecurityLambda
+      Principal: "events.amazonaws.com"
+      SourceArn: !GetAtt SQSEventRule.Arn
+
+  #### SNS Topic (Optional) ####
+  AlertSNSTopic:
+    Type: AWS::SNS::Topic
+    Condition: UseSNSTopic
+    Properties:
+      TopicName: SQSSecurityAlerts
+
+  #### Control Tower Guardrail ####
+  ControlTowerGuardrail:
+    Type: AWS::ControlTower::EnabledControl
+    Properties:
+      ControlIdentifier: !Ref ControlIdentifier
+      TargetIdentifier: !Ref TargetOUArn
+
+Conditions:
+  Conditions:
+    UseSNSTopic:
+      Fn::Not:
+        - Fn::Equals:
+            - !Ref SNSTopicArn
+            - ""
+
+Outputs:
+  LambdaFunctionARN:
+    Description: ARN of the deployed Lambda function.
+    Value: !GetAtt SQSSecurityLambda.Arn
+
+  IAMRoleARN:
+    Description: ARN of the IAM role for the Lambda function.
+    Value: !GetAtt SQSSecurityLambdaRole.Arn
+
+  SNSTopicARN:
+    Condition: UseSNSTopic
+    Description: ARN of the SNS topic for alerts.
+    Value: !Ref AlertSNSTopic

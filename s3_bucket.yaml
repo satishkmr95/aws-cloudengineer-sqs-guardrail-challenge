@@ -1,0 +1,29 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation template to create an S3 bucket for storing Lambda function code.
+
+Resources:
+  S3LambdaBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "lambda-${AWS::AccountId}-${AWS::Region}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldLambdaZips
+            Status: Enabled
+            ExpirationInDays: 30
+            Prefix: lambda_function.zip
+
+Outputs:
+  S3BucketName:
+    Description: Name of the S3 bucket created for storing Lambda function code.
+    Value: !Ref S3LambdaBucket

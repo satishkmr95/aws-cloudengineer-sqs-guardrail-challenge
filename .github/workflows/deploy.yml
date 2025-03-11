@@ -1,0 +1,68 @@
+name: Deploy CloudFormation Stack
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy to AWS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Create S3 Bucket (if not exists)
+        run: |
+          aws cloudformation deploy \
+            --template-file s3_bucket.yaml \
+            --stack-name SQSInitialSetup \
+            --capabilities CAPABILITY_NAMED_IAM
+
+      - name: Get S3 Bucket Name
+        id: get_bucket
+        run: |
+          BUCKET_NAME=$(aws cloudformation describe-stacks --stack-name SQSInitialSetup --query "Stacks[0].Outputs[?OutputKey=='S3BucketName'].OutputValue" --output text)
+          echo "BUCKET_NAME=${BUCKET_NAME}" >> $GITHUB_ENV
+
+      - name: Package Lambda
+        run: |
+          HASH=$(tar c lambda_function | sha256sum | cut -d ' ' -f1)
+          ZIP_NAME=lambda_function_${HASH}.zip
+          zip -r $ZIP_NAME lambda_function/
+          echo "ZIP_NAME=${ZIP_NAME}" >> $GITHUB_ENV
+
+      - name: Check if Lambda Code Exists in S3
+        run: |
+          if aws s3 ls "s3://${{ env.BUCKET_NAME }}/${{ env.ZIP_NAME }}" >/dev/null 2>&1; then
+            echo "NO_CHANGES=true" >> $GITHUB_ENV
+          else
+            echo "NO_CHANGES=false" >> $GITHUB_ENV
+          fi
+
+      - name: Upload Lambda Code to S3 (Only If Changes Detected)
+        if: env.NO_CHANGES == 'false'
+        run: |
+          zip -r ${{ env.ZIP_NAME }} lambda_function/
+          aws s3 cp ${{ env.ZIP_NAME }} s3://${{ env.BUCKET_NAME }}/${{ env.ZIP_NAME }}
+
+      - name: Deploy CloudFormation Stack
+        run: |
+          aws cloudformation deploy \
+            --template-file template.yaml \
+            --stack-name SQSSecurityGuardrail \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --parameter-overrides \
+                S3BucketName=${{ env.BUCKET_NAME }} \
+                LambdaFunctionZip=${{ env.ARTIFACT_NAME }} \
+                TargetOUArn=${{ env.OU_ARN }} \
+                ControlIdentifier=${{ env.CONTROL_IDENTIFIER }}
