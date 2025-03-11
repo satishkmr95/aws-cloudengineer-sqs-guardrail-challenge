@@ -134,12 +134,11 @@ Resources:
       TargetIdentifier: !Ref TargetOUArn
 
 Conditions:
-  Conditions:
-    UseSNSTopic:
-      Fn::Not:
-        - Fn::Equals:
-            - !Ref SNSTopicArn
-            - ""
+  UseSNSTopic:
+    Fn::Not:
+      - Fn::Equals:
+          - !Ref SNSTopicArn
+          - ""
 
 Outputs:
   LambdaFunctionARN:
