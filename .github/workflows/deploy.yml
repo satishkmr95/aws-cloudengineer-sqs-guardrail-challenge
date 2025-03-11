@@ -67,3 +67,4 @@ jobs:
                 TargetOUArn=${{ vars.OU_ARN }} \
                 ControlIdentifier=${{ vars.CONTROL_IDENTIFIER }} \
                 PermissionBoundaryArn=${{ vars.PERMISSION_BOUNDARY_ARN }} \
+                SNSTopicArn=${{ vars.SNS_TOPIC_ARN }}
