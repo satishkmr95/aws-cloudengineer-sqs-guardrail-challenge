@@ -28,7 +28,9 @@ Parameters:
   ControlIdentifier:
     Type: String
     Description: AWS Control Tower Control Identifier to enforce compliance.
+    Default: ""
     AllowedValues:
+      - ""
       - AWS-GR_RESTRICTED_SQS_NO_DEAD_LETTER_QUEUE # This is the one we should use in this example
       - AWS-GR_ENCRYPTION_S3_BUCKETS
       - AWS-GR_RESTRICTED_S3_PUBLIC_READ_ACCESS
@@ -129,11 +131,17 @@ Resources:
   #### Control Tower Guardrail ####
   ControlTowerGuardrail:
     Type: AWS::ControlTower::EnabledControl
+    Condition: UseControlTowerGuardrail
     Properties:
       ControlIdentifier: !Sub "arn:aws:controltower::aws:enabled-control/${ControlIdentifier}"
       TargetIdentifier: !Ref TargetOUArn
 
 Conditions:
+  UseControlTowerGuardrail:
+    Fn::Not:
+      - Fn::Equals:
+          - !Ref ControlIdentifier
+          - ""
   UseSNSTopic:
     Fn::Not:
       - Fn::Equals:
