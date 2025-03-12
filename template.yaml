@@ -130,7 +130,7 @@ Resources:
   ControlTowerGuardrail:
     Type: AWS::ControlTower::EnabledControl
     Properties:
-      ControlIdentifier: !Ref ControlIdentifier
+      ControlIdentifier: !Sub "arn:aws:controltower::aws:enabled-control/${ControlIdentifier}"
       TargetIdentifier: !Ref TargetOUArn
 
 Conditions:
