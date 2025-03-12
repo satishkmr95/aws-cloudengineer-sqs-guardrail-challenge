@@ -4,6 +4,44 @@ Description: >
 
 Resources:
 
+  ### ✅ S3 Bucket to Store CloudTrail Logs ###
+  CloudTrailBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "cloudtrail-logs-${AWS::AccountId}-${AWS::Region}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      VersioningConfiguration:
+        Status: Enabled
+
+  ### ✅ S3 Bucket Policy for CloudTrail ###
+  CloudTrailBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref CloudTrailBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudtrail.amazonaws.com
+            Action: "s3:PutObject"
+            Resource: !Sub "arn:aws:s3:::${CloudTrailBucket}/AWSLogs/${AWS::AccountId}/*"
+            Condition:
+              StringEquals:
+                s3:x-amz-acl: "bucket-owner-full-control"
+          - Effect: Allow
+            Principal:
+              Service: cloudtrail.amazonaws.com
+            Action: "s3:GetBucketAcl"
+            Resource: !Sub "arn:aws:s3:::${CloudTrailBucket}"
+
   ### ✅ CloudTrail Trail to Capture SQS Events ###
   SQSTrail:
     Type: AWS::CloudTrail::Trail
@@ -21,22 +59,6 @@ Resources:
             - Type: AWS::SQS::Queue
               Values:
                 - !Sub "arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:*"
-
-  ### ✅ S3 Bucket to Store CloudTrail Logs ###
-  CloudTrailBucket:
-    Type: AWS::S3::Bucket
-    Properties:
-      BucketName: !Sub "cloudtrail-logs-${AWS::AccountId}-${AWS::Region}"
-      PublicAccessBlockConfiguration:
-        BlockPublicAcls: true
-        BlockPublicPolicy: true
-        IgnorePublicAcls: true
-        RestrictPublicBuckets: true
-      OwnershipControls:
-        Rules:
-          - ObjectOwnership: BucketOwnerEnforced
-      VersioningConfiguration:
-        Status: Enabled
 
   ### ✅ IAM Role for CloudTrail to Send Events to EventBridge ###
   CloudTrailEventBridgeRole:
