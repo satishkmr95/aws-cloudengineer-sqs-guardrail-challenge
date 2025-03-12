@@ -34,6 +34,13 @@ jobs:
           BUCKET_NAME=$(aws cloudformation describe-stacks --stack-name SQSInitialSetup --query "Stacks[0].Outputs[?OutputKey=='S3BucketName'].OutputValue" --output text)
           echo "BUCKET_NAME=${BUCKET_NAME}" >> $GITHUB_ENV
 
+      - name: Deploy CloudTrailEventBridge Stack
+        run: |
+          aws cloudformation deploy \
+            --template-file cloudtrail_eventbridge.yaml \
+            --stack-name CloudTrailEventBridge \
+            --capabilities CAPABILITY_NAMED_IAM
+
       - name: Package Lambda
         run: |
           HASH=$(tar c lambda_function | sha256sum | cut -d ' ' -f1)
@@ -55,7 +62,7 @@ jobs:
           zip -r ${{ env.ZIP_NAME }} lambda_function/
           aws s3 cp ${{ env.ZIP_NAME }} s3://${{ env.BUCKET_NAME }}/${{ env.ZIP_NAME }}
 
-      - name: Deploy CloudFormation Stack
+      - name: Deploy SQSSecurityGuardrail CloudFormation Stack
         run: |
           aws cloudformation deploy \
             --template-file template.yaml \

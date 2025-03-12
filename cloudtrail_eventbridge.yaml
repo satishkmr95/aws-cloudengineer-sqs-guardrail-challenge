@@ -1,0 +1,69 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Configures CloudTrail to send SQS events to EventBridge and grants necessary permissions.
+
+Resources:
+
+  ### ✅ CloudTrail Trail to Capture SQS Events ###
+  SQSTrail:
+    Type: AWS::CloudTrail::Trail
+    Properties:
+      TrailName: SQSTrail
+      S3BucketName: !Ref CloudTrailBucket
+      IsMultiRegionTrail: false
+      EnableLogFileValidation: true
+      IncludeGlobalServiceEvents: true
+      IsLogging: true
+      EventSelectors:
+        - ReadWriteType: WriteOnly
+          IncludeManagementEvents: true
+          DataResources:
+            - Type: AWS::SQS::Queue
+              Values:
+                - !Sub "arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:*"
+
+  ### ✅ S3 Bucket to Store CloudTrail Logs ###
+  CloudTrailBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "cloudtrail-logs-${AWS::AccountId}-${AWS::Region}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      VersioningConfiguration:
+        Status: Enabled
+
+  ### ✅ IAM Role for CloudTrail to Send Events to EventBridge ###
+  CloudTrailEventBridgeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: CloudTrailEventBridgeRole
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudtrail.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: AllowCloudTrailToEventBridge
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: events:PutEvents
+                Resource: !Sub "arn:aws:events:${AWS::Region}:${AWS::AccountId}:event-bus/default"
+
+Outputs:
+  CloudTrailBucket:
+    Description: S3 Bucket storing CloudTrail logs.
+    Value: !Ref CloudTrailBucket
+
+  CloudTrailRoleARN:
+    Description: ARN of the IAM Role for CloudTrail to send events to EventBridge.
+    Value: !GetAtt CloudTrailEventBridgeRole.Arn
