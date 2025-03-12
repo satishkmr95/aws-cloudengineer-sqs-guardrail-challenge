@@ -63,7 +63,7 @@ jobs:
             --capabilities CAPABILITY_NAMED_IAM \
             --parameter-overrides \
                 S3BucketName=${{ env.BUCKET_NAME }} \
-                LambdaFunctionZip=${{ env.ARTIFACT_NAME }} \
+                LambdaFunctionZip=${{ env.ZIP_NAME }} \
                 TargetOUArn=${{ vars.OU_ARN }} \
                 ControlIdentifier=${{ vars.CONTROL_IDENTIFIER }} \
                 PermissionBoundaryArn=${{ vars.PERMISSION_BOUNDARY_ARN }} \
